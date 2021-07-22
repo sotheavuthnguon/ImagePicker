@@ -1,5 +1,6 @@
 import UIKit
 import ImagePicker
+import Photos
 
 class ViewController: UIViewController, ImagePickerDelegate {
 
@@ -52,21 +53,21 @@ class ViewController: UIViewController, ImagePickerDelegate {
   func cancelButtonDidPress(_ imagePicker: ImagePickerController) {
     imagePicker.dismiss(animated: true, completion: nil)
   }
-
-  func wrapperDidPress(_ imagePicker: ImagePickerController, images: [UIImage]) {
-    /*
-    guard images.count > 0 else { return }
-
-    let lightboxImages = images.map {
-      return LightboxImage(image: $0)
-    }
-
-    let lightbox = LightboxController(images: lightboxImages, startIndex: 0)
-    imagePicker.present(lightbox, animated: true, completion: nil)
-     */
+  
+  func wrapperDidPress(_ imagePicker: ImagePickerController, images: [UIImage], url: [URL]) {
+    
   }
-
-  func doneButtonDidPress(_ imagePicker: ImagePickerController, images: [UIImage]) {
+  
+  func doneButtonDidPress(_ imagePicker: ImagePickerController, images: [UIImage], url: [URL]) {
     imagePicker.dismiss(animated: true, completion: nil)
   }
+  
+  func doneButtonDidPressWithAssets(_ imagePicker: ImagePickerController, assets: [PHAsset], capturedImage: UIImage?, capturedVideoURL: URL?) {
+    
+  }
+  
+  func doneRecordingDidPress(_ imagePicker: ImagePickerController, _ outputFileURLPath: String) {
+    
+  }
+  
 }

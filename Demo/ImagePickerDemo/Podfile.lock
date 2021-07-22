@@ -1,16 +1,22 @@
 PODS:
-  - ImagePicker (3.1.0)
+  - ImagePicker (3.2.0)
 
 DEPENDENCIES:
-  - ImagePicker (from `../../`)
+  - ImagePicker (from `https://github.com/sotheavuthnguon/ImagePicker.git`, branch `sotheavuth`)
 
 EXTERNAL SOURCES:
   ImagePicker:
-    :path: "../../"
+    :branch: sotheavuth
+    :git: https://github.com/sotheavuthnguon/ImagePicker.git
+
+CHECKOUT OPTIONS:
+  ImagePicker:
+    :commit: 9cca7a0347014a525ed4803912046eff4cd1c458
+    :git: https://github.com/sotheavuthnguon/ImagePicker.git
 
 SPEC CHECKSUMS:
-  ImagePicker: db1fd7626337b2577c523bef5f499bbbe5a37079
+  ImagePicker: 1d950bbb2422548ed58791b4ec7f42fe42920511
 
-PODFILE CHECKSUM: 23900dc409ff6cf1fd583a459dd91c9db12e588b
+PODFILE CHECKSUM: 016b9dee1b1da5bf160bdd88077d1395f5d54c44
 
-COCOAPODS: 1.9.3
+COCOAPODS: 1.10.1
