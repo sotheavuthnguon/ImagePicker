@@ -7,6 +7,9 @@ protocol CameraViewDelegate: class {
   func setFlashButtonHidden(_ hidden: Bool)
   func imageToLibrary()
   func cameraNotAvailable()
+  func videoToLibrary(_ outputFileURLPath : String)
+  func prepareCapturedImage(with image: UIImage)
+  func prepareCapturedVideo(with url: URL?)
 }
 
 class CameraView: UIViewController, CLLocationManagerDelegate, CameraManDelegate {
@@ -227,11 +230,38 @@ class CameraView: UIViewController, CLLocationManagerDelegate, CameraManDelegate
         })
     })
 
-    cameraMan.takePhoto(previewLayer, location: locationManager?.latestLocation) {
+    cameraMan.takePhoto(previewLayer, location: locationManager?.latestLocation) { capturedImage in
       completion()
-      self.delegate?.imageToLibrary()
+//      self.delegate?.imageToLibrary()
+        self.delegate?.prepareCapturedImage(with: capturedImage)
     }
   }
+    
+    func takeVideo(_ completion: @escaping () -> Void) {
+      guard let previewLayer = previewLayer else { return }
+
+//      UIView.animate(withDuration: 0.1, animations: {
+//        self.capturedImageView.alpha = 1
+//        }, completion: { _ in
+//          UIView.animate(withDuration: 0.1, animations: {
+//            self.capturedImageView.alpha = 0
+//          })
+//      })
+      cameraMan.takeVideo(previewLayer, location: locationManager?.latestLocation) {
+        completion()
+        //self.delegate?.imageToLibrary()
+      }
+    }
+    
+    func stopRecordingVideo(){
+        cameraMan.stopRecordingVideo()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+//            self.delegate?.videoToLibrary(self.cameraMan.outputFileURLPath)
+            self.delegate?.prepareCapturedVideo(with: self.cameraMan.outputFileURL)
+            self.cameraMan.outputFileURL = nil
+        }
+       
+    }
 
   // MARK: - Timer methods
 
@@ -321,3 +351,4 @@ class CameraView: UIViewController, CLLocationManagerDelegate, CameraManDelegate
     setupPreviewLayer()
   }
 }
+

@@ -47,3 +47,4 @@ class ImageGalleryViewCell: UICollectionViewCell {
     imageView.image = image
   }
 }
+

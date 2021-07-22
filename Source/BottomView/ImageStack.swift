@@ -31,3 +31,4 @@ open class ImageStack {
     return assets.contains(asset)
   }
 }
+

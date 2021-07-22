@@ -268,3 +268,4 @@ extension ImageGalleryView: UICollectionViewDelegate {
     }
   }
 }
+

@@ -28,3 +28,4 @@ class ImageGalleryLayout: UICollectionViewFlowLayout {
     return newAttributes
   }
 }
+

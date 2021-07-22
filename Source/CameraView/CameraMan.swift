@@ -8,7 +8,7 @@ protocol CameraManDelegate: class {
   func cameraMan(_ cameraMan: CameraMan, didChangeInput input: AVCaptureDeviceInput)
 }
 
-class CameraMan {
+class CameraMan:NSObject {
   weak var delegate: CameraManDelegate?
 
   let session = AVCaptureSession()
@@ -16,9 +16,13 @@ class CameraMan {
 
   var backCamera: AVCaptureDeviceInput?
   var frontCamera: AVCaptureDeviceInput?
+  var audioDeviceInput: AVCaptureDeviceInput?
   var stillImageOutput: AVCaptureStillImageOutput?
   var startOnFrontCamera: Bool = false
-
+  var stillVideoOutput: AVCaptureMovieFileOutput?
+  var outputFileURLPath = ""
+  var outputFileURL: URL?
+ 
   deinit {
     stop()
   }
@@ -46,12 +50,17 @@ class CameraMan {
         break
       }
     }
-
-    // Output
-    stillImageOutput = AVCaptureStillImageOutput()
-    stillImageOutput?.outputSettings = [AVVideoCodecKey: AVVideoCodecJPEG]
+    
+    if #available(iOS 10.0, *) {
+        guard let audioDevice = AVCaptureDevice.default(.builtInMicrophone, for: AVMediaType.audio, position: .unspecified) else { return }
+        self.audioDeviceInput = try? AVCaptureDeviceInput(device: audioDevice)
+        guard let input = self.audioDeviceInput else { return }
+        if session.canAddInput(input) {
+            session.addInput(input)
+        }
+    }
   }
-
+    
   func addInput(_ input: AVCaptureDeviceInput) {
     configurePreset(input)
 
@@ -94,19 +103,33 @@ class CameraMan {
   // MARK: - Session
 
   var currentInput: AVCaptureDeviceInput? {
-    return session.inputs.first as? AVCaptureDeviceInput
+    for input in session.inputs {
+        if (input as? AVCaptureDeviceInput) != self.audioDeviceInput {
+            return input as? AVCaptureDeviceInput
+        }
+    }
+    return nil
   }
 
   fileprivate func start() {
     // Devices
     setupDevices()
-
-    guard let input = (self.startOnFrontCamera) ? frontCamera ?? backCamera : backCamera, let output = stillImageOutput else { return }
+    
+    guard let input = (self.startOnFrontCamera) ? frontCamera ?? backCamera : backCamera else { return }
 
     addInput(input)
 
-    if session.canAddOutput(output) {
-      session.addOutput(output)
+    stillVideoOutput = AVCaptureMovieFileOutput()
+      guard let outputVideo = self.stillVideoOutput else { return }
+       if session.canAddOutput(outputVideo) {
+         session.addOutput(outputVideo)
+      }
+    
+    stillImageOutput = AVCaptureStillImageOutput()
+    stillImageOutput?.outputSettings = [AVVideoCodecKey: AVVideoCodecJPEG]
+    guard let outputImage = self.stillImageOutput else { return }
+     if session.canAddOutput(outputImage) {
+       session.addOutput(outputImage)
     }
 
     queue.async {
@@ -117,6 +140,10 @@ class CameraMan {
       }
     }
   }
+    
+    func resume() {
+        self.session.startRunning()
+    }
 
   func stop() {
     self.session.stopRunning()
@@ -149,27 +176,56 @@ class CameraMan {
     }
   }
 
-  func takePhoto(_ previewLayer: AVCaptureVideoPreviewLayer, location: CLLocation?, completion: (() -> Void)? = nil) {
-    guard let connection = stillImageOutput?.connection(with: AVMediaType.video) else { return }
-
+  func takePhoto(_ previewLayer: AVCaptureVideoPreviewLayer, location: CLLocation?, completion: ((UIImage) -> Void)? = nil) {
+    guard let connection =  stillImageOutput?.connection(with: AVMediaType.video) else { return }
     connection.videoOrientation = Helper.videoOrientation()
-
+    if currentInput == frontCamera {
+        connection.isVideoMirrored = true
+    }
     queue.async {
       self.stillImageOutput?.captureStillImageAsynchronously(from: connection) { buffer, error in
         guard let buffer = buffer, error == nil && CMSampleBufferIsValid(buffer),
           let imageData = AVCaptureStillImageOutput.jpegStillImageNSDataRepresentation(buffer),
-          let image = UIImage(data: imageData)
+          let image = UIImage(data: imageData),
+          let safeCompletion = completion
           else {
-            DispatchQueue.main.async {
-              completion?()
-            }
+//            DispatchQueue.main.async {
+//              completion?(image)
+//            }
             return
         }
-
-        self.savePhoto(image, location: location, completion: completion)
+        safeCompletion(image)
+//        self.savePhoto(image, location: location, completion: completion)
       }
     }
   }
+    
+    func takeVideo(_ previewLayer: AVCaptureVideoPreviewLayer, location: CLLocation?, completion: (() -> Void)? = nil) {
+        
+      guard let outputVideo = self.stillVideoOutput else { return }
+      guard let connection =  stillVideoOutput?.connection(with: AVMediaType.video) else { return }
+      connection.videoOrientation = Helper.videoOrientation()
+        if currentInput == frontCamera {
+            connection.isVideoMirrored = true
+        }
+      queue.async {
+        
+          if outputVideo.isRecording {
+              outputVideo.stopRecording()
+          }else{
+              let paths = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
+              let fileUrl = paths[0].appendingPathComponent("output.mov")
+              outputVideo.startRecording(to: fileUrl, recordingDelegate: self)
+          }
+        }
+    }
+        
+    
+    func stopRecordingVideo(){
+        guard  let outputVideo = self.stillVideoOutput else { return }
+        outputVideo.stopRecording()
+    }
+    
 
   func savePhoto(_ image: UIImage, location: CLLocation?, completion: (() -> Void)? = nil) {
     PHPhotoLibrary.shared().performChanges({
@@ -248,3 +304,16 @@ class CameraMan {
     ]
   }
 }
+
+extension CameraMan: AVCaptureFileOutputRecordingDelegate {
+    func fileOutput(_ output: AVCaptureFileOutput, didFinishRecordingTo outputFileURL: URL, from connections: [AVCaptureConnection], error: Error?) {
+        if error == nil {
+//            UISaveVideoAtPathToSavedPhotosAlbum(outputFileURL.path, nil, nil, nil)
+//            outputFileURLPath = outputFileURL.path
+            self.outputFileURL = outputFileURL
+        }
+    }
+    
+    
+}
+

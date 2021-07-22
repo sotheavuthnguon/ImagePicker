@@ -6,6 +6,8 @@ protocol BottomContainerViewDelegate: class {
   func doneButtonDidPress()
   func cancelButtonDidPress()
   func imageStackViewDidPress()
+  func buttonDidLongPressBegan()
+  func buttonDidLongPressEnded()
 }
 
 open class BottomContainerView: UIView {
@@ -15,10 +17,12 @@ open class BottomContainerView: UIView {
   }
 
   var configuration = ImagePickerConfiguration()
-
+  var centerXImageStackCountViewConstraint: NSLayoutConstraint!
+  var centerYImageStackCountViewConstraint: NSLayoutConstraint!
+    
   lazy var pickerButton: ButtonPicker = { [unowned self] in
     let pickerButton = ButtonPicker(configuration: self.configuration)
-    pickerButton.setTitleColor(UIColor.white, for: UIControl.State())
+    pickerButton.setTitleColor(UIColor(red: 249/255, green: 161/255, blue: 27/255, alpha: 1), for: UIControl.State())
     pickerButton.delegate = self
     pickerButton.numberLabel.isHidden = !self.configuration.showsImageCountLabel
 
@@ -28,13 +32,43 @@ open class BottomContainerView: UIView {
   lazy var borderPickerButton: UIView = {
     let view = UIView()
     view.backgroundColor = UIColor.clear
-    view.layer.borderColor = UIColor.white.cgColor
+    view.layer.borderColor = UIColor(red: 249/255, green: 161/255, blue: 27/255, alpha: 1).cgColor // UIColor.white.cgColor
+//    view.layer.borderColor = UIColor.white.cgColor
     view.layer.borderWidth = ButtonPicker.Dimensions.borderWidth
     view.layer.cornerRadius = ButtonPicker.Dimensions.buttonBorderSize / 2
 
     return view
     }()
 
+    open lazy var imageStackCountLabel: UILabel = { [unowned self] in
+        let label = UILabel()
+        label.font = UIFont.systemFont(ofSize: 10, weight: .bold)
+        label.textColor = UIColor(red: 249/255, green: 161/255, blue: 27/255, alpha: 1)
+        label.text = "0"
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.isHidden = true
+        return label
+    }()
+    
+    open lazy var imageStackCountView: UIView = { [unowned self] in
+        let view = UIView()
+        view.layer.cornerRadius = 13
+        view.backgroundColor = (UIColor.black).withAlphaComponent(0.5)
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.isHidden = true
+        return view
+    }()
+    
+    open lazy var infoLable: UILabel = { [unowned self] in
+      let label = UILabel()
+      label.font = self.configuration.infoLabelFont
+      label.textColor = .white
+      label.textAlignment = .center
+      label.text = "Hold for video and tap for photo"
+      label.alpha = 0.5
+      return label
+      }()
+    
   open lazy var doneButton: UIButton = { [unowned self] in
     let button = UIButton()
     button.setTitle(self.configuration.cancelButtonTitle, for: UIControl.State())
@@ -78,7 +112,9 @@ open class BottomContainerView: UIView {
   }
 
   func configure() {
-    [borderPickerButton, pickerButton, doneButton, stackView, topSeparator].forEach {
+    imageStackCountView.addSubview(imageStackCountLabel)
+    
+    [borderPickerButton, pickerButton, doneButton, stackView, topSeparator ,infoLable, imageStackCountView].forEach {
       addSubview($0)
       $0.translatesAutoresizingMaskIntoConstraints = false
     }
@@ -86,7 +122,11 @@ open class BottomContainerView: UIView {
     backgroundColor = configuration.backgroundColor
     stackView.accessibilityLabel = "Image stack"
     stackView.addGestureRecognizer(tapGestureRecognizer)
-
+    
+    centerXImageStackCountViewConstraint = NSLayoutConstraint(item: imageStackCountView, attribute: .centerX, relatedBy: .equal, toItem: stackView, attribute: .centerX, multiplier: 1, constant: 0)
+    
+    centerYImageStackCountViewConstraint = NSLayoutConstraint(item: imageStackCountView, attribute: .centerY, relatedBy: .equal, toItem: stackView, attribute: .centerY, multiplier: 1, constant: 0)
+    
     setupConstraints()
     if configuration.galleryOnly {
       borderPickerButton.isHidden = true
@@ -95,8 +135,25 @@ open class BottomContainerView: UIView {
     if !configuration.allowMultiplePhotoSelection {
       stackView.isHidden = true
     }
+    
+    stackView.isHidden = true
   }
 
+    func updateImageStackCountView(count: Int) {
+        UIView.animate(withDuration: 0.25) {
+            self.imageStackCountLabel.text = "\(count)"
+            self.imageStackCountLabel.isHidden = (count == 0)
+            self.imageStackCountView.isHidden = (count == 0)
+            self.stackView.isHidden = (count == 0)
+            
+            let step = (count > 4) ? 3 : count - 1
+            
+            self.centerXImageStackCountViewConstraint.constant = CGFloat(3 + (step * -3))
+            self.centerYImageStackCountViewConstraint.constant = CGFloat(3 + (step * -3))
+        }
+        
+
+    }
   // MARK: - Action methods
 
   @objc func doneButtonDidPress(_ button: UIButton) {
@@ -131,4 +188,13 @@ extension BottomContainerView: ButtonPickerDelegate {
   func buttonDidPress() {
     delegate?.pickerButtonDidPress()
   }
+    
+    func buttonDidLongPressBegan() {
+        delegate?.buttonDidLongPressBegan()
+    }
+    
+    func buttonDidLongPressEnded() {
+        delegate?.buttonDidLongPressEnded()
+    }
 }
+

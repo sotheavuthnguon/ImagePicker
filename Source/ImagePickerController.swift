@@ -4,9 +4,11 @@ import Photos
 
 @objc public protocol ImagePickerDelegate: NSObjectProtocol {
 
-  func wrapperDidPress(_ imagePicker: ImagePickerController, images: [UIImage])
-  func doneButtonDidPress(_ imagePicker: ImagePickerController, images: [UIImage])
-  func cancelButtonDidPress(_ imagePicker: ImagePickerController)
+    func wrapperDidPress(_ imagePicker: ImagePickerController, images: [UIImage] , url : [URL])
+    func doneButtonDidPress(_ imagePicker: ImagePickerController, images: [UIImage], url : [URL])
+    func doneButtonDidPressWithAssets(_ imagePicker: ImagePickerController, assets: [PHAsset], capturedImage: UIImage?, capturedVideoURL: URL?)
+    func cancelButtonDidPress(_ imagePicker: ImagePickerController)
+    func doneRecordingDidPress(_ imagePicker: ImagePickerController ,_ outputFileURLPath: String)
 }
 
 open class ImagePickerController: UIViewController {
@@ -15,7 +17,7 @@ open class ImagePickerController: UIViewController {
 
   struct GestureConstants {
     static let maximumHeight: CGFloat = 200
-    static let minimumHeight: CGFloat = 125
+    static let minimumHeight: CGFloat = 100//125
     static let velocity: CGFloat = 100
   }
 
@@ -33,13 +35,15 @@ open class ImagePickerController: UIViewController {
     let view = BottomContainerView(configuration: self.configuration)
     view.backgroundColor = self.configuration.bottomContainerColor
     view.delegate = self
-
+    view.infoLable.text = self.configuration.infoTitle
+    view.doneButton.setTitle(self.configuration.doneButtonTitle, for: .normal)
+    view.doneButton.isHidden = true
     return view
     }()
 
   open lazy var topView: TopView = { [unowned self] in
     let view = TopView(configuration: self.configuration)
-    view.backgroundColor = UIColor.clear
+    view.backgroundColor = self.configuration.bottomContainerColor//UIColor.clear
     view.delegate = self
 
     return view
@@ -71,7 +75,7 @@ open class ImagePickerController: UIViewController {
 
   @objc open weak var delegate: ImagePickerDelegate?
   open var stack = ImageStack()
-  open var imageLimit = 0
+  open var imageLimit = 9
   open var preferredImageSize: CGSize?
   open var startOnFrontCamera = false
   var totalSize: CGSize { return UIScreen.main.bounds.size }
@@ -79,8 +83,10 @@ open class ImagePickerController: UIViewController {
   var initialContentOffset: CGPoint?
   var numberOfCells: Int?
   var statusBarHidden = true
-
+  var isFirstTime = true
+  fileprivate var recordTimer: Timer?
   fileprivate var isTakingPicture = false
+  fileprivate var recordCount = 0
   open var doneButtonTitle: String? {
     didSet {
       if let doneButtonTitle = doneButtonTitle {
@@ -106,11 +112,26 @@ open class ImagePickerController: UIViewController {
     super.init(coder: aDecoder)
   }
 
+    open lazy var infoLable: UILabel = { [unowned self] in
+      let label = UILabel()
+      label.font = UIFont.systemFont(ofSize: 12)
+      label.textColor = .white
+      label.textAlignment = .center
+      label.text = "Hold for video and tap for photo"
+      return label
+      }()
   // MARK: - View lifecycle
 
+    open override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        cameraController.cameraMan.stop()
+//        _ = try? AVAudioSession.sharedInstance().setActive(false)
+    }
+    
+    
   open override func viewDidLoad() {
     super.viewDidLoad()
-    
+    UINavigationBar.appearance().tintColor = .white
     let addSubview: (UIView) -> Void = { subview in
       self.view.addSubview(subview)
       subview.translatesAutoresizingMaskIntoConstraints = false
@@ -132,17 +153,21 @@ open class ImagePickerController: UIViewController {
     view.backgroundColor = UIColor.white
     view.backgroundColor = configuration.mainColor
 
+    
     subscribe()
     setupConstraints()
   }
 
   open override func viewWillAppear(_ animated: Bool) {
     super.viewWillAppear(animated)
-
-    if configuration.managesAudioSession {
-      _ = try? AVAudioSession.sharedInstance().setActive(true)
+    
+//    _ = try? AVAudioSession.sharedInstance().setActive(true)
+    if isFirstTime {
+        isFirstTime = false
+    } else {
+        cameraController.cameraMan.resume()
     }
-
+    
     statusBarHidden = UIApplication.shared.isStatusBarHidden
 
     self.handleRotation(nil)
@@ -284,10 +309,16 @@ open class ImagePickerController: UIViewController {
   @objc func adjustButtonTitle(_ notification: Notification) {
     guard let sender = notification.object as? ImageStack else { return }
 
-    let title = !sender.assets.isEmpty ?
-      configuration.doneButtonTitle : configuration.cancelButtonTitle
-    bottomContainer.doneButton.setTitle(title, for: UIControl.State())
+//    let title = !sender.assets.isEmpty ?
+//      configuration.doneButtonTitle : configuration.cancelButtonTitle
+//    bottomContainer.doneButton.setTitle(title, for: UIControl.State())
+    bottomContainer.doneButton.isHidden = sender.assets.isEmpty
+    bottomContainer.updateImageStackCountView(count: sender.assets.count)
   }
+    
+    private func setupImageStackCountView(count: Int) {
+        
+    }
   
   @objc func dismissIfNeeded() {
     // If only one image is requested and a push occures, automatically dismiss the ImagePicker
@@ -357,7 +388,7 @@ open class ImagePickerController: UIViewController {
     guard isBelowImageLimit() && !isTakingPicture else { return }
     isTakingPicture = true
     bottomContainer.pickerButton.isEnabled = false
-    bottomContainer.stackView.startLoader()
+//    bottomContainer.stackView.startLoader()
     let action: () -> Void = { [weak self] in
       guard let `self` = self else { return }
       self.cameraController.takePicture { self.isTakingPicture = false }
@@ -369,71 +400,176 @@ open class ImagePickerController: UIViewController {
       action()
     }
   }
+    
+   
+    fileprivate func takeVideo() {
+      isTakingPicture = true
+      bottomContainer.pickerButton.isEnabled = false
+      //bottomContainer.stackView.startLoader()
+      let action: () -> Void = { [weak self] in
+        guard let `self` = self else { return }
+        self.cameraController.takeVideo { self.isTakingPicture = false }
+      }
+
+      if configuration.collapseCollectionViewWhileShot {
+        collapseGalleryView(action)
+      } else {
+        action()
+      }
+    }
+    
 }
 
 // MARK: - Action methods
 
 extension ImagePickerController: BottomContainerViewDelegate {
 
+    func secondsToHoursMinutesSeconds (seconds : Int) -> String {
+      let hour = seconds / 3600
+      let minute = (seconds % 3600) / 60
+      let second = (seconds % 3600) % 60
+      return String(format: "%02i:%02i:%02i",hour ,minute, second)
+    }
+    
+    @objc func recordTimerStart(){
+        recordCount += 1
+        topView.timeLable.text = secondsToHoursMinutesSeconds(seconds: recordCount)
+    }
+    
+    func buttonDidLongPressEnded() {
+        if !isBelowImageLimit() { return }
+        guard let recordTimer =  recordTimer else {
+            self.cameraController.stopRecordingVideo()
+            isTakingPicture = false
+            return
+        }
+        recordTimer.invalidate()
+        recordCount = 0
+        self.cameraController.stopRecordingVideo()
+        isTakingPicture = false
+    }
+  
+    func buttonDidLongPressBegan() {
+        guard isBelowImageLimit() && !isTakingPicture else { return }
+        takeVideo()
+        recordTimer =  Timer.scheduledTimer(timeInterval: 1, target: self, selector: #selector(recordTimerStart), userInfo: nil, repeats: true)
+    }
+    
   func pickerButtonDidPress() {
     takePicture()
   }
 
   func doneButtonDidPress() {
-    var images: [UIImage]
-    if let preferredImageSize = preferredImageSize {
-      images = AssetManager.resolveAssets(stack.assets, size: preferredImageSize)
-    } else {
-      images = AssetManager.resolveAssets(stack.assets)
-    }
-
-    delegate?.doneButtonDidPress(self, images: images)
+    sendMediaToCaptionScreen()
   }
+    
+    private func sendMediaToCaptionScreen(capturedImage: UIImage? = nil, capturedVideoURL: URL? = nil) {
+        if let preferredImageSize = preferredImageSize {
+    //        **** For getting UIImages and videoURLs ****
+    //        AssetManager.resolveAssets(stack.assets, size: preferredImageSize) { (images, url) in
+    //            self.delegate?.doneButtonDidPress(self, images: images,url: url)
+    //        }
+            
+    //      **** For getting PHAsset of Image and video ****
+            self.delegate?.doneButtonDidPressWithAssets(self, assets: stack.assets, capturedImage: capturedImage, capturedVideoURL: capturedVideoURL)
+        } else {
+            
+    //        **** For getting UIImages and videoURLs ****
+    //        AssetManager.resolveAssets(stack.assets) { (images, url) in
+    //            self.delegate?.doneButtonDidPress(self, images: images,url: url)
+    //        }
+            
+    //      **** For getting PHAsset of Image and video ****
+            self.delegate?.doneButtonDidPressWithAssets(self, assets: stack.assets, capturedImage: capturedImage, capturedVideoURL: capturedVideoURL)
+        }
+    }
 
   func cancelButtonDidPress() {
     delegate?.cancelButtonDidPress(self)
   }
 
   func imageStackViewDidPress() {
-    var images: [UIImage]
     if let preferredImageSize = preferredImageSize {
-        images = AssetManager.resolveAssets(stack.assets, size: preferredImageSize)
+        AssetManager.resolveAssets(stack.assets, size: preferredImageSize) { (images, url) in
+            self.delegate?.wrapperDidPress(self, images: images,url: url)
+        }
     } else {
-        images = AssetManager.resolveAssets(stack.assets)
+        AssetManager.resolveAssets(stack.assets) { (images, url) in
+            self.delegate?.wrapperDidPress(self, images: images,url: url)
+        }
     }
-
-    delegate?.wrapperDidPress(self, images: images)
   }
 }
 
 extension ImagePickerController: CameraViewDelegate {
 
+    func prepareCapturedVideo(with url: URL?) {
+        galleryView.shouldTransform = true
+        bottomContainer.pickerButton.isEnabled = true
+        topView.timeLable.text = ""
+        self.sendMediaToCaptionScreen(capturedVideoURL: url)
+    }
+    
+    func prepareCapturedImage(with image: UIImage) {
+        galleryView.shouldTransform = true
+        bottomContainer.pickerButton.isEnabled = true
+        self.sendMediaToCaptionScreen(capturedImage: image)
+    }
+    
   func setFlashButtonHidden(_ hidden: Bool) {
     if configuration.flashButtonAlwaysHidden {
       topView.flashButton.isHidden = hidden
     }
   }
 
-  func imageToLibrary() {
+  func videoToLibrary(_ outputFileURLPath: String) {
+//     delegate?.doneRecordingDidPress(self,outputFileURLPath)
+    
     guard let collectionSize = galleryView.collectionSize else { return }
-
+    
     galleryView.fetchPhotos {
-      guard let asset = self.galleryView.assets.first else { return }
-      if self.configuration.allowMultiplePhotoSelection == false {
-        self.stack.assets.removeAll()
-      }
-      self.stack.pushAsset(asset)
+        guard let asset = self.galleryView.assets.first else { return }
+        if self.configuration.allowMultiplePhotoSelection == false {
+            self.stack.assets.removeAll()
+        }
+        self.stack.pushAsset(asset)
+        self.galleryView.collectionView.reloadData()
     }
-
+    
     galleryView.shouldTransform = true
     bottomContainer.pickerButton.isEnabled = true
-
+    topView.timeLable.text = ""
+    recordTimer?.invalidate()
+    
     UIView.animate(withDuration: 0.3, animations: {
-      self.galleryView.collectionView.transform = CGAffineTransform(translationX: collectionSize.width, y: 0)
-      }, completion: { _ in
+        self.galleryView.collectionView.transform = CGAffineTransform(translationX: collectionSize.width, y: 0)
+    }, completion: { _ in
         self.galleryView.collectionView.transform = CGAffineTransform.identity
     })
+    showGalleryView()
   }
+  
+    func imageToLibrary() {
+        guard let collectionSize = galleryView.collectionSize else { return }
+        
+        galleryView.fetchPhotos {
+            guard let asset = self.galleryView.assets.first else { return }
+            if self.configuration.allowMultiplePhotoSelection == false {
+                self.stack.assets.removeAll()
+            }
+            self.stack.pushAsset(asset)
+        }
+        
+        galleryView.shouldTransform = true
+        bottomContainer.pickerButton.isEnabled = true
+        
+        UIView.animate(withDuration: 0.3, animations: {
+            self.galleryView.collectionView.transform = CGAffineTransform(translationX: collectionSize.width, y: 0)
+        }, completion: { _ in
+            self.galleryView.collectionView.transform = CGAffineTransform.identity
+        })
+        showGalleryView()
+    }
 
   func cameraNotAvailable() {
     topView.flashButton.isHidden = true
@@ -444,7 +580,7 @@ extension ImagePickerController: CameraViewDelegate {
   // MARK: - Rotation
 
   open override var supportedInterfaceOrientations: UIInterfaceOrientationMask {
-    return .portrait
+    return .all
   }
 
   @objc public func handleRotation(_ note: Notification?) {
@@ -452,24 +588,25 @@ extension ImagePickerController: CameraViewDelegate {
   }
 
   func applyOrientationTransforms() {
+
     let rotate = configuration.rotationTransform
 
     UIView.animate(withDuration: 0.25, animations: {
-      [self.topView.rotateCamera, self.bottomContainer.pickerButton,
-       self.bottomContainer.stackView, self.bottomContainer.doneButton].forEach {
-        $0.transform = rotate
-      }
-
+//      [self.topView.rotateCamera, self.bottomContainer.pickerButton,
+//       self.bottomContainer.stackView, self.bottomContainer.doneButton].forEach {
+//        $0.transform = rotate
+//      }
+//
       self.galleryView.collectionViewLayout.invalidateLayout()
 
-      let translate: CGAffineTransform
-      if Helper.previousOrientation.isLandscape {
-        translate = CGAffineTransform(translationX: -20, y: 15)
-      } else {
-        translate = CGAffineTransform.identity
-      }
-
-      self.topView.flashButton.transform = rotate.concatenating(translate)
+//      let translate: CGAffineTransform
+//      if Helper.previousOrientation.isLandscape {
+//        translate = CGAffineTransform(translationX: -20, y: 15)
+//      } else {
+//        translate = CGAffineTransform.identity
+//      }
+//
+//      self.topView.flashButton.transform = rotate.concatenating(translate)
     })
   }
 }
@@ -485,6 +622,10 @@ extension ImagePickerController: TopViewDelegate {
   func rotateDeviceDidPress() {
     cameraController.rotateCamera()
   }
+    
+    func backButtonDidPress() {
+        self.dismiss(animated: true, completion: nil)
+    }
 }
 
 // MARK: - Pan gesture handler
@@ -549,3 +690,4 @@ extension ImagePickerController: ImageGalleryPanGestureDelegate {
     }
   }
 }
+

@@ -3,6 +3,8 @@ import UIKit
 protocol ButtonPickerDelegate: class {
 
   func buttonDidPress()
+  func buttonDidLongPressBegan()
+  func buttonDidLongPressEnded()
 }
 
 class ButtonPicker: UIButton {
@@ -76,13 +78,24 @@ class ButtonPicker: UIButton {
   // MARK: - Configuration
 
   func setupButton() {
-    backgroundColor = UIColor.white
+    backgroundColor = UIColor(red: 249/255, green: 161/255, blue: 27/255, alpha: 1) //UIColor.white
+//    backgroundColor = UIColor.white
     layer.cornerRadius = Dimensions.buttonSize / 2
     accessibilityLabel = "Take photo"
     addTarget(self, action: #selector(pickerButtonDidPress(_:)), for: .touchUpInside)
     addTarget(self, action: #selector(pickerButtonDidHighlight(_:)), for: .touchDown)
+    let longPress = UILongPressGestureRecognizer(target: self, action: #selector(longPress(_:)))
+    self.addGestureRecognizer(longPress)
   }
 
+    @objc func longPress(_ guesture: UILongPressGestureRecognizer) {
+        if guesture.state == UIGestureRecognizer.State.began {
+            delegate?.buttonDidLongPressBegan()
+        }else if guesture.state == UIGestureRecognizer.State.ended {
+            delegate?.buttonDidLongPressEnded()
+            backgroundColor = UIColor(red: 249/255, green: 161/255, blue: 27/255, alpha: 1)
+        }
+   }
   // MARK: - Actions
 
   @objc func recalculatePhotosCount(_ notification: Notification) {
@@ -91,7 +104,7 @@ class ButtonPicker: UIButton {
   }
 
   @objc func pickerButtonDidPress(_ button: UIButton) {
-    backgroundColor = UIColor.white
+    backgroundColor = UIColor(red: 249/255, green: 161/255, blue: 27/255, alpha: 1) // UIColor.white
     numberLabel.textColor = UIColor.black
     numberLabel.sizeToFit()
     delegate?.buttonDidPress()
@@ -99,6 +112,7 @@ class ButtonPicker: UIButton {
 
   @objc func pickerButtonDidHighlight(_ button: UIButton) {
     numberLabel.textColor = UIColor.white
-    backgroundColor = UIColor(red: 0.3, green: 0.3, blue: 0.3, alpha: 1)
+    backgroundColor = UIColor(red: 249/255, green: 161/255, blue: 27/255, alpha: 0.5) //UIColor(red: 0.3, green: 0.3, blue: 0.3, alpha: 1)
   }
 }
+

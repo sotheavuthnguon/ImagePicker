@@ -5,13 +5,13 @@ import UIKit
 
   // MARK: Colors
 
-  @objc public var backgroundColor = UIColor(red: 0.15, green: 0.19, blue: 0.24, alpha: 1)
+  @objc public var backgroundColor = UIColor.black//UIColor(red: 0.15, green: 0.19, blue: 0.24, alpha: 1)
   @objc public var gallerySeparatorColor = UIColor.black.withAlphaComponent(0.6)
   @objc public var mainColor = UIColor(red: 0.09, green: 0.11, blue: 0.13, alpha: 1)
   @objc public var noImagesColor = UIColor(red: 0.86, green: 0.86, blue: 0.86, alpha: 1)
   @objc public var noCameraColor = UIColor(red: 0.86, green: 0.86, blue: 0.86, alpha: 1)
   @objc public var settingsColor = UIColor.white
-  @objc public var bottomContainerColor = UIColor(red: 0.09, green: 0.11, blue: 0.13, alpha: 1)
+  @objc public var bottomContainerColor = UIColor.black //UIColor(red: 0.09, green: 0.11, blue: 0.13, alpha: 1)
 
   // MARK: Fonts
 
@@ -21,6 +21,7 @@ import UIKit
   @objc public var noImagesFont = UIFont.systemFont(ofSize: 18, weight: UIFont.Weight.medium)
   @objc public var noCameraFont = UIFont.systemFont(ofSize: 18, weight: UIFont.Weight.medium)
   @objc public var settingsFont = UIFont.systemFont(ofSize: 16, weight: UIFont.Weight.medium)
+  @objc public var infoLabelFont = UIFont.systemFont(ofSize: 14)
 
   // MARK: Titles
 
@@ -32,6 +33,7 @@ import UIKit
   @objc public var settingsTitle = "Settings"
   @objc public var requestPermissionTitle = "Permission denied"
   @objc public var requestPermissionMessage = "Please, allow the application to access to your photo library."
+  @objc public var infoTitle = "Hold for video and tap for photo"
 
   // MARK: Dimensions
 
@@ -110,3 +112,4 @@ extension ImagePickerConfiguration {
     return Helper.getTransform(fromDeviceOrientation: Helper.previousOrientation)
   }
 }
+

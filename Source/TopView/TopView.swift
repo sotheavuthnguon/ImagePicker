@@ -2,16 +2,17 @@ import UIKit
 
 protocol TopViewDelegate: class {
 
-  func flashButtonDidPress(_ title: String)
-  func rotateDeviceDidPress()
+    func flashButtonDidPress(_ title: String)
+    func rotateDeviceDidPress()
+    func backButtonDidPress()
 }
 
 open class TopView: UIView {
 
   struct Dimensions {
     static let leftOffset: CGFloat = 11
-    static let rightOffset: CGFloat = 7
-    static let height: CGFloat = 34
+    static let rightOffset: CGFloat = 11
+    static let height: CGFloat = 34 + 50 + 10
   }
 
   var configuration = ImagePickerConfiguration()
@@ -34,6 +35,23 @@ open class TopView: UIView {
 
     return button
     }()
+    
+    open lazy var backButton: UIButton = { [unowned self] in
+      let button = UIButton()
+      button.setImage(AssetManager.getImage("back-button"), for: UIControl.State())
+      button.addTarget(self, action: #selector(backButtonDidPress(_:)), for: .touchUpInside)
+      button.translatesAutoresizingMaskIntoConstraints = false
+      return button
+      }()
+    
+    open lazy var timeLable: UILabel = { [unowned self] in
+      let label = UILabel()
+      label.font = UIFont.systemFont(ofSize: 14)
+      label.textColor = .white
+      label.textAlignment = .center
+      label.text = ""
+      return label
+      }()
 
   open lazy var rotateCamera: UIButton = { [unowned self] in
     let button = UIButton()
@@ -74,6 +92,7 @@ open class TopView: UIView {
       buttons.append(rotateCamera)
     }
 
+    
     for button in buttons {
       button.layer.shadowColor = UIColor.black.cgColor
       button.layer.shadowOpacity = 0.5
@@ -82,14 +101,25 @@ open class TopView: UIView {
       button.translatesAutoresizingMaskIntoConstraints = false
       addSubview(button)
     }
-
+    timeLable.layer.shadowColor = UIColor.black.cgColor
+    timeLable.layer.shadowOpacity = 0.5
+    timeLable.layer.shadowOffset = CGSize(width: 0, height: 1)
+    timeLable.layer.shadowRadius = 1
+    timeLable.translatesAutoresizingMaskIntoConstraints = false
+    addSubview(timeLable)
     flashButton.isHidden = configuration.flashButtonAlwaysHidden
-
+    addSubview(backButton)
     setupConstraints()
+    
   }
 
   // MARK: - Action methods
 
+    @objc func backButtonDidPress(_ button: UIButton) {
+        delegate?.backButtonDidPress()
+    }
+
+    
   @objc func flashButtonDidPress(_ button: UIButton) {
     currentFlashIndex += 1
     currentFlashIndex = currentFlashIndex % flashButtonTitles.count
@@ -117,3 +147,4 @@ open class TopView: UIView {
     delegate?.rotateDeviceDidPress()
   }
 }
+

@@ -35,3 +35,4 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
     }
   }
 }
+
